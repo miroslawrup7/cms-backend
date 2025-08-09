@@ -21,8 +21,6 @@ app.use(helmet())
 app.use(express.json())
 app.use(cookieParser())
 
-const cors = require('cors');
-
 const ALLOWED_ORIGINS = [
   process.env.FRONTEND_URL,                 // produkcja: np. https://cms-frontend-dkru.onrender.com
   'http://localhost:3000',                  // lokalny frontend
@@ -40,7 +38,7 @@ const corsOptions = {
 };
 
 // preflight + właściwe żądania
-app.options('*', cors(corsOptions));
+// app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
 
 
