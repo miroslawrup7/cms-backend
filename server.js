@@ -21,10 +21,26 @@ app.use(helmet())
 app.use(express.json())
 app.use(cookieParser())
 
-app.use(cors({
-  origin: FRONTEND_URL,
-  credentials: true
-}))
+const ALLOWED_ORIGINS = [
+  process.env.FRONTEND_URL,                 // produkcja: np. https://cms-frontend-dkru.onrender.com
+  'http://localhost:3000',                  // lokalny frontend
+  'https://cms-frontend-dkru.onrender.com', // na wszelki wypadek “na sztywno”
+].filter(Boolean);
+
+const corsOptions = {
+  origin(origin, cb) {
+    // zezwól także na brak nagłówka Origin (np. curl/Postman)
+    if (!origin) return cb(null, true);
+    const ok = ALLOWED_ORIGINS.includes(origin);
+    return cb(ok ? null : new Error('Not allowed by CORS'), ok);
+  },
+  credentials: true,
+};
+
+// preflight + właściwe żądania
+// app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
+
 
 // ===============================
 // Rate limit tylko dla /api/auth
