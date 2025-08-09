@@ -93,6 +93,12 @@ app.use((err, req, res, next) => {
 mongoose.connect(MONGO_URI, {})
   .then(() => {
     console.log('✅ Połączono z MongoDB')
+
+    // 🔍 Log szczegółów połączenia
+    const conn = mongoose.connection
+    console.log(`📦 Baza: ${conn.name}`)
+    console.log(`🌐 Host: ${conn.host}`)
+
     app.listen(PORT, () => console.log(`🚀 Serwer działa na porcie ${PORT}`))
   })
   .catch((err) => {
