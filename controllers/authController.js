@@ -5,11 +5,16 @@ const User = require('../models/User')
 const PendingUser = require('../models/PendingUser')
 const validateFields = require('../utils/validate')
 
-// wspólne opcje ciasteczka – lokalnie: Lax/nie-Secure, prod (Render): None/Secure
+const isProd = process.env.NODE_ENV === 'production'
+
+// wspólne opcje ciasteczka – lokalnie: Lax/nie-Secure, prod (Render): None/Secure + Partitioned
 const baseCookieOptions = {
   httpOnly: true,
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  secure:   process.env.NODE_ENV === 'production',
+  sameSite: isProd ? 'none' : 'lax',
+  secure:   isProd,
+  // CHIPS – wymagane dla third-party cookies (frontend i backend na różnych domenach)
+  // w dev nie ustawiamy (HTTP), w prod ustawiamy
+  ...(isProd ? { partitioned: true } : {}),
   path: '/'
 }
 
@@ -57,7 +62,6 @@ const login = async (req, res) => {
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' })
 
-    // ustaw cookie z JWT (7 dni lub jak wolisz 1 dzień – poniżej 1 dzień jak dotąd)
     res.cookie('token', token, {
       ...baseCookieOptions,
       maxAge: 24 * 60 * 60 * 1000 // 1 dzień
@@ -71,8 +75,7 @@ const login = async (req, res) => {
 
 // Wylogowanie
 const logout = (req, res) => {
-  // wyczyść cookie z takimi samymi atrybutami (SameSite/Secure/path),
-  // żeby przeglądarka na pewno je nadpisała
+  // wyczyść z TAKIMI SAMYMI atrybutami (sameSite/secure/partitioned/path)
   res.clearCookie('token', {
     ...baseCookieOptions
   })
