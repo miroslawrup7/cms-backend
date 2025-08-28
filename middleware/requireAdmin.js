@@ -1,10 +1,12 @@
-// Sprawdza, czy zalogowany użytkownik jest adminem
+// middleware/requireAdmin.js v.2
+const AppError = require("../utils/AppError");
+
 module.exports = (req, res, next) => {
     if (!req.user) {
-        return res.status(401).json({ message: "Brak autoryzacji" })
+        return next(new AppError("Brak autoryzacji", 401));
     }
     if (req.user.role !== "admin") {
-        return res.status(403).json({ message: "Brak dostępu — wymagane uprawnienia administratora" })
+        return next(new AppError("Brak dostępu — wymagane uprawnienia administratora", 403));
     }
-    next()
-}
+    next();
+};

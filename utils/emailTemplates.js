@@ -1,7 +1,7 @@
 // utils/emailTemplates.js
 const { APP_NAME = 'CMS' } = process.env
 
-function approvedUserEmail({ username, email }) {
+function approvedUserEmail({ username }) {
   const subject = `[${APP_NAME}] Twoje konto zostało zatwierdzone`
   const text = `Cześć ${username || ''},
 
@@ -18,7 +18,7 @@ Zespół ${APP_NAME}
   return { subject, text, html }
 }
 
-function rejectedUserEmail({ username, email }) {
+function rejectedUserEmail({ username }) {
   const subject = `[${APP_NAME}] Wniosek rejestracyjny odrzucony`
   const text = `Cześć ${username || ''},
 

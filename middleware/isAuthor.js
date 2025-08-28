@@ -1,23 +1,23 @@
-// middleware/isAuthor.js
-const Article = require('../models/Article')
+// middleware/isAuthor.js v.2
+const Article = require("../models/Article");
+const AppError = require("../utils/AppError");
 
 const isAuthor = async (req, res, next) => {
-  try {
-    const article = await Article.findById(req.params.id)
+    try {
+        const article = await Article.findById(req.params.id);
 
-    if (!article) {
-      return res.status(404).json({ message: 'Artykuł nie znaleziony' })
+        if (!article) {
+            return next(new AppError("Artykuł nie znaleziony", 404));
+        }
+
+        if (article.author.toString() !== req.user._id.toString()) {
+            return next(new AppError("Brak uprawnień do edycji lub usunięcia tego artykułu", 403));
+        }
+
+        next();
+    } catch (err) {
+        next(err);
     }
+};
 
-    if (article.author.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Brak uprawnień do edycji lub usunięcia tego artykułu' })
-    }
-
-    next()
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ message: 'Błąd serwera' })
-  }
-}
-
-module.exports = isAuthor
+module.exports = isAuthor;

@@ -1,22 +1,22 @@
-// middleware/requireAuthorOrAdmin.js
-const Article = require('../models/Article')
+// middleware/requireAuthorOrAdmin.js v.2
+const Article = require("../models/Article");
+const AppError = require("../utils/AppError");
 
 module.exports = async function requireAuthorOrAdmin(req, res, next) {
-  try {
-    const { id } = req.params
-    const article = await Article.findById(id)
-    if (!article) return res.status(404).json({ message: 'Artykuł nie istnieje.' })
+    try {
+        const { id } = req.params;
+        const article = await Article.findById(id);
+        if (!article) return next(new AppError("Artykuł nie istnieje.", 404));
 
-    const isOwner = String(article.author) === String(req.user._id)
-    const isAdmin = req.user.role === 'admin'
-    if (!isOwner && !isAdmin) {
-      return res.status(403).json({ message: 'Brak uprawnień.' })
+        const isOwner = String(article.author) === String(req.user._id);
+        const isAdmin = req.user.role === "admin";
+        if (!isOwner && !isAdmin) {
+            return next(new AppError("Brak uprawnień.", 403));
+        }
+
+        req.article = article;
+        next();
+    } catch (e) {
+        next(e);
     }
-
-    // Możesz przekazać dalej, jeśli chcesz użyć w kontrolerze:
-    req.article = article
-    return next()
-  } catch (e) {
-    return next(e)
-  }
-}
+};

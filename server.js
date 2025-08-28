@@ -1,4 +1,4 @@
-// server.js
+// server.js v.3
 const express = require('express')
 const mongoose = require('mongoose')
 const dotenv = require('dotenv')
@@ -11,46 +11,35 @@ const path = require('path')
 dotenv.config()
 const app = express()
 
-app.set('trust proxy', 1); // potrzebne, żeby Secure/SameSite działało poprawnie za CDN/Proxy
-
 // Środowisko
 const PORT = process.env.PORT || 5000
 const MONGO_URI = process.env.MONGO_URI
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:1234'
+
 
 // Middleware
 app.use(helmet())
 app.use(express.json())
 app.use(cookieParser())
 
-const ALLOWED_ORIGINS = [
-  process.env.FRONTEND_URL,                 // produkcja: np. https://cms-frontend-dkru.onrender.com
-  'http://localhost:3000',                  // lokalny frontend
-  'https://cms-frontend-dkru.onrender.com', // na wszelki wypadek “na sztywno”
-].filter(Boolean);
+const ALLOWED_ORIGINS = ['http://localhost:3000'];
 
 const corsOptions = {
-  origin(origin, cb) {
-    // zezwól także na brak nagłówka Origin (np. curl/Postman)
-    if (!origin) return cb(null, true);
-    const ok = ALLOWED_ORIGINS.includes(origin);
-    return cb(ok ? null : new Error('Not allowed by CORS'), ok);
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Not allowed by CORS'));
+    }
   },
   credentials: true,
 };
 
-// preflight + właściwe żądania
-// app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
 
-
-// ===============================
 // Rate limit tylko dla /api/auth
-// prod: 100/15 min, dev: 1000/1 min
-// ===============================
 const authLimiter = rateLimit({
-  windowMs: process.env.NODE_ENV === 'production' ? (15 * 60 * 1000) : (60 * 1000),
-  max: process.env.NODE_ENV === 'production' ? 100 : 1000,
+  windowMs: 60 * 1000,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Zbyt wiele żądań. Spróbuj ponownie później.' }
@@ -59,7 +48,7 @@ app.use('/api/auth', authLimiter)
 
 // Statyczne pliki (obrazki)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-  setHeaders: (res, p) => {
+  setHeaders: (res) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
   }
 }))
@@ -76,19 +65,46 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Nie znaleziono endpointu.' })
 })
 
-// Globalny handler błędów (ZA trasami)
-app.use((err, req, res, next) => {
-  // Multer: za duży plik
+// Globalny error handler - musi być na końcu, po wszystkich middleware i routes
+app.use((err, req, res) => {
+  // 1. SPECJALNE PRZYPADKI (istniejąca logika dla Multera)
   if (err && err.code === 'LIMIT_FILE_SIZE') {
     return res.status(413).json({ message: 'Za duży plik. Limit 5MB.' })
   }
-  // Multer / fileFilter: nieprawidłowy typ pliku
   if (err && err.message && /pliki graficzne|plik[ów]* graficzny|image/i.test(err.message)) {
     return res.status(400).json({ message: 'Dozwolone są tylko pliki graficzne.' })
   }
 
-  console.error('Błąd:', err.stack || err)
-  return res.status(500).json({ message: 'Wewnętrzny błąd serwera' })
+  // 2. NOWA LOGIKA - AppError i standardowe błędy
+  err.statusCode = err.statusCode || 500
+  err.status = err.status || 'error'
+
+  // Development - szczegółowe logi
+  if (process.env.NODE_ENV === 'development') {
+    console.error('ERROR 💥:', err)
+    return res.status(err.statusCode).json({
+      status: err.status,
+      error: err,
+      message: err.message,
+      stack: err.stack
+    })
+  }
+
+  // Production - ogólne komunikaty
+  if (err.isOperational) {
+    // Błędy operacyjne (AppError) - pokazujemy komunikat
+    return res.status(err.statusCode).json({
+      status: err.status,
+      message: err.message
+    })
+  } else {
+    // Nieznane błędy programistyczne - nie pokazujemy szczegółów
+    console.error('ERROR 💥:', err)
+    return res.status(500).json({
+      status: 'error',
+      message: 'Coś poszło nie tak!'
+    })
+  }
 })
 
 // Połączenie z MongoDB i start
@@ -96,7 +112,6 @@ mongoose.connect(MONGO_URI, {})
   .then(() => {
     console.log('✅ Połączono z MongoDB')
 
-    // 🔍 Log szczegółów połączenia
     const conn = mongoose.connection
     console.log(`📦 Baza: ${conn.name}`)
     console.log(`🌐 Host: ${conn.host}`)
